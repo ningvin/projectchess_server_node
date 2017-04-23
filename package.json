@@ -1,0 +1,14 @@
+{
+  "name": "Project Chess - Node Server",
+  "version": "0.0.1",
+  "description": "Node server for project chess",
+  "author": "Ningvin",
+  "main": "server.js",
+  "dependencies": {
+    "body-parser": "^1.17.1",
+    "express": "^4.15.2",
+    "jsonwebtoken": "^7.3.0",
+    "socket.io": "^1.7.3",
+    "socketio-jwt": "^4.5.0"
+  }
+}
