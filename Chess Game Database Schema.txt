@@ -1,0 +1,35 @@
+CREATE TABLE User (
+    `id` int NOT NULL,
+    `name` varchar(10) NOT NULL,
+    `password` varchar(20) NOT NULL,
+    `salt` varchar(20) NOT NULL,
+    `email` varchar(30) NOT NULL,
+    `win` int,
+    `loss` int,
+    `draw` int,
+    PRIMARY KEY(`id`)
+    );
+
+CREATE TABLE Game (
+    `id` int NOT NULL,
+    `start_time` timestamp NULL DEFAULT NULL,
+    `end_time` timestamp NULL DEFAULT NULL,
+    `status` enum('winB', 'winW', 'draw', 'going') NOT NULL,
+    `black_player_type` enum('human', 'ai') NOT NULL,
+    `black_player_name` varchar(10),
+    `black_user_id` int NOT NULL,
+    `white_player_type` enum('human', 'ai') NOT NULL,
+    `white_player_name` varchar(10),
+    `white_user_id` int NOT NULL,
+    PRIMARY KEY(`id`),
+    FOREIGN KEY(`white_user_id`) REFERENCES User(`id`),
+    FOREIGN KEY(`black_user_id`) REFERENCES User(`id`)
+    );
+
+CREATE TABLE Friendship (
+    `user1` int,
+    `user2` int,
+    CONSTRAINT pk_Friendship PRIMARY KEY(`user1`, `user2`),
+    FOREIGN KEY(`user1`) REFERENCES User(`id`),
+    FOREIGN KEY(`user2`) REFERENCES User(`id`)
+    );
