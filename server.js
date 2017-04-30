@@ -246,17 +246,15 @@ io.sockets.on('connection', function(socket) {
     socket.on('game_launch', function(req) {
         console.log('Game Launch!');
         io.to(req.id).emit('game_launch', {
-            message: 'let\'s go!'
+            id: socket.user.id
         });
     });
     
     socket.on('move', function(req) {
-        var move = {
-            move: req.move,
-            user: socket.user.alias,
-            id: socket.user.id
-        };
-        socket.broadcast.to(req.room).emit('move', move);
+        io.to(req.id).emit('move', {
+            id: socket.user.id,
+            move: req.move
+        });
     });
     
     socket.on('chat', function(req) {
