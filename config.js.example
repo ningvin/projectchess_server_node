@@ -1,5 +1,11 @@
 module.exports = {
 	
-	'secret': 'jetfuelcantmeltstealbeams'
+	'secret': 'jetfuelcantmeltstealbeams',
+    database: {
+        host: 'localhost',
+        user: 'admin',
+        password: '1234',
+        database: 'project_chess'
+    }
 	
 }
