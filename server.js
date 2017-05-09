@@ -90,8 +90,6 @@ app.post('/login', function(req, res) {
             var user = results[0];
             bcrypt.compare(loginData.password, user.password.toString(),
                 function(err, result) {
-                    console.log(err);
-                    console.log(result);
                     if (result) {
                         delete user.password;
                         var token = jwt.sign(user, app.get('secret'), {
@@ -126,7 +124,14 @@ app.post('/login', function(req, res) {
 app.post('/register', function(req, res) {
     var user = req.body;
     
-    // validate
+    if (!isValidUserData(user)) {
+        res.status(400).send({
+            success: false,
+            message: 'Bad request',
+            details: 'One or more required field is missing or invalid'
+        });
+        return;
+    }
     
     user.id = shortid.generate();
     bcrypt.hash(user.password, 10, function(hashError, hash) {
@@ -357,11 +362,13 @@ io.sockets.on('connection', function(socket) {
 // utility functions =========
 // ===========================
 
+function isBlank(str) {
+    return (!str || /^\s*$/.test(str));
+}
+
 function isValidUserData(user) {
-    return typeof user.name !== 'undefined'
-            && typeof user.email !== 'undefined'
-            && typeof user.alias !== 'undefined'
-            && typeof user.id !== 'undefined';
+    return !isBlank(user.name) && !isBlank(user.email)
+            && !isBlank(user.alias) && !isBlank(user.password);
 }
 
 function queryDB(query, values, onSuccess, onError) {
