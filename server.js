@@ -9,6 +9,8 @@ var socketioJwt = require('socketio-jwt-auth');
 var config      = require('./config');
 
 var mysql       = require('mysql');
+var bcrypt      = require('bcrypt');
+var shortid     = require('shortid');
 
 // ===========================
 // configuration =============
@@ -27,7 +29,6 @@ app.use(function(req, res, next) {
     next();
 });
 
-/*
 var pool = mysql.createPool({
     connectionLimit : 100, //important
     host: config.database.host,
@@ -36,51 +37,128 @@ var pool = mysql.createPool({
     database: config.database.database,
     debug:  false
 });
-*/
 
 // ===========================
 // routes ====================
 // ===========================
 
 app.get('/', function(req, res) {
-    res.json({
-        message: 'Main'
+    pool.getConnection(function(err, connection) {
+        if (err) {
+            res.json({
+                success: false,
+                message: err.toString()
+            });
+            return;
+        }
+        
+        res.json({
+            success: true,
+            message: connection.threadId
+        });
+        
+        connection.release();
     });
 });
 
 app.post('/login', function(req, res) {
-    //var user = req.body;
-    var user = {
-        alias: req.body.alias,
-        id: req.body.alias,
-        email: 'peter.pan@web.de',
-        name: 'Peter Pan'
-    };
     
-    console.log(user);
+    var loginData = req.body;
     
-    if (!isValidUserData(user)) {
-        res.json({
+    if (loginData.alias == null || loginData.password == null) {
+        res.status(400).send({
             success: false,
-            message: 'Invalid User Data'
+            message: 'Bad request',
+            details: '"alias" or "password" field missing'
         });
-    } else {
-        var token = jwt.sign(user, app.get('secret'), {
-            expiresIn: '1d'
-        });
-        
-        user.token = token;
-        
-        res.json({
-            success: true,
-            message: 'Login successful',
-            user: user
-        });
+        return;
     }
+    
+    queryDB('SELECT * FROM user WHERE alias = ?',
+        [loginData.alias],
+        function(results, fields) {
+            
+            if (results == null || results.length == 0) {
+                res.status(401).send({
+                    success: false,
+                    message: 'Invalid user credentials',
+                    details: 'User does not exist'
+                });
+                return;
+            }
+            
+            var user = results[0];
+            bcrypt.compare(loginData.password, user.password.toString(),
+                function(err, result) {
+                    console.log(err);
+                    console.log(result);
+                    if (result) {
+                        delete user.password;
+                        var token = jwt.sign(user, app.get('secret'), {
+                            expiresIn: '1d'
+                        });
+                        res.json({
+                            success: true,
+                            message: 'Login successful',
+                            token: token
+                        });
+                    } else {
+                        res.status(401).send({
+                            success: false,
+                            message: 'Invalid user credentials',
+                            details: 'Wrong password'
+                        });
+                    }
+                }
+            );
+        },
+        function(error) {
+            res.status(500).send({
+                success: false,
+                message: 'Internal server error',
+                details: error.toString()
+            });
+        }
+    );
     
 });
 
 app.post('/register', function(req, res) {
+    var user = req.body;
+    
+    // validate
+    
+    user.id = shortid.generate();
+    bcrypt.hash(user.password, 10, function(hashError, hash) {
+        
+        if (hashError) {
+            res.status(500).send({
+                success: false,
+                message: 'Internal server error',
+                details: hashError.toString()
+            });
+            return;
+        }
+        
+        queryDB('INSERT INTO user VALUES(?, ?, ?, ?, ?, ?, ?, ?)',
+            [user.id, user.alias, user.name, user.email, hash, 0, 0, 0],
+            function(results, fields) {
+                res.json({
+                    success: true,
+                    message: 'User created'
+                });
+            },
+            function(dbError) {
+                res.status(400).send({
+                    success: false,
+                    message: 'Bad request',
+                    details: dbError.toString()
+                });
+            }
+        );
+    });
+    
+    
     
 });
 
@@ -286,8 +364,22 @@ function isValidUserData(user) {
             && typeof user.id !== 'undefined';
 }
 
-function combineIds(hostId, clientId) {
-    return hostId + "-|-" + clientId;
+function queryDB(query, values, onSuccess, onError) {
+    pool.getConnection(function(err, connection) {
+        if (err) {
+            onError(err);
+            return;
+        }
+        
+        connection.query(query, values, function(err, results, fields) {
+            connection.release();
+            if (err) {
+                onError(err);
+            } else {
+                onSuccess(results, fields);
+            }
+        });
+    });
 }
 
 // ===========================
