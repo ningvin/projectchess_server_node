@@ -17,6 +17,8 @@ var shortid     = require('shortid');
 // ===========================
 
 var port = process.env.PORT || 8080;
+var originPort = process.env.ORIGIN_PORT || 8000;
+var accessControlOrigin = 'http://127.0.0.1:' + originPort.toString();
 
 app.set('secret', config.secret);
 
@@ -24,7 +26,7 @@ app.set('secret', config.secret);
 app.use(bodyParser.json());
 
 app.use(function(req, res, next) {
-    res.setHeader('Access-Control-Allow-Origin', 'http://127.0.0.1:8000');
+    res.setHeader('Access-Control-Allow-Origin', accessControlOrigin);
     res.setHeader('Access-Control-Allow-Headers', 'content-type');
     next();
 });
@@ -43,21 +45,8 @@ var pool = mysql.createPool({
 // ===========================
 
 app.get('/', function(req, res) {
-    pool.getConnection(function(err, connection) {
-        if (err) {
-            res.json({
-                success: false,
-                message: err.toString()
-            });
-            return;
-        }
-        
-        res.json({
-            success: true,
-            message: connection.threadId
-        });
-        
-        connection.release();
+    res.json({
+        success: true
     });
 });
 
@@ -175,12 +164,12 @@ apiRoutes.use(function(req, res, next) {
     if (token != null) {
         jwt.verify(token, app.get('secret'), function(err, decoded) {
             if (err) {
-                return res.json({
+                return res.status(403).send({
                     success: false,
                     message: 'Failed to authenticate: invalid token'
                 });
             } else {
-                console.log(decoded);
+                //console.log(decoded);
                 req.decoded = decoded;
                 next();
             }
@@ -200,11 +189,15 @@ apiRoutes.get('/test', function(req, res) {
 });
 
 apiRoutes.get('/games/:id', function(req, res) {
-    
+    res.send({
+        success: false
+    });
 });
 
 apiRoutes.post('/games', function(req, res) {
-    
+    res.send({
+        success: false
+    });
 });
 
 apiRoutes.get('/users', function(req, res) {
@@ -220,7 +213,36 @@ apiRoutes.get('/users', function(req, res) {
 });
 
 apiRoutes.get('/users/:id', function(req, res) {
-    
+    var userId = req.params.id;
+    if (userId === 'me' || userId === req.decoded.id) {
+        res.json({
+            success: true,
+            message: 'User data',
+            user: req.decoded
+        });
+    } else {
+        queryDB('SELECT alias, wins, draws, losses FROM user WHERE id = ?',
+            [userId],
+            function(results, fields) {
+                var user = {};
+                if (results != null && results.length > 0) {
+                    user = results[0];
+                }
+                res.json({
+                    success: true,
+                    message: 'User data',
+                    user: user
+                });
+            },
+            function(dbError) {
+                res.status(500).send({
+                    success: false,
+                    message: 'Internal server error',
+                    details: dbError.toString()
+                });
+            }
+        );
+    }
 });
 
 app.use('/api', apiRoutes);
