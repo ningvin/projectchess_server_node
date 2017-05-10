@@ -1,6 +1,11 @@
 module.exports = {
 	
 	'secret': 'jetfuelcantmeltstealbeams',
+    port: 8080,
+    accessControl: {
+        host: '127.0.0.1',
+        port: 8000
+    },
     database: {
         host: 'localhost',
         user: 'admin',
