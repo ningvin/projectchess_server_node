@@ -9,12 +9,16 @@ var socketioJwt = require('socketio-jwt-auth');
 var config      = require('./config');
 
 var mysql       = require('mysql');
+var bcrypt      = require('bcrypt');
+var shortid     = require('shortid');
 
 // ===========================
 // configuration =============
 // ===========================
 
 var port = process.env.PORT || 8080;
+var originPort = process.env.ORIGIN_PORT || 8000;
+var accessControlOrigin = 'http://127.0.0.1:' + originPort.toString();
 
 app.set('secret', config.secret);
 
@@ -22,12 +26,11 @@ app.set('secret', config.secret);
 app.use(bodyParser.json());
 
 app.use(function(req, res, next) {
-    res.setHeader('Access-Control-Allow-Origin', 'http://127.0.0.1:8000');
+    res.setHeader('Access-Control-Allow-Origin', accessControlOrigin);
     res.setHeader('Access-Control-Allow-Headers', 'content-type');
     next();
 });
 
-/*
 var pool = mysql.createPool({
     connectionLimit : 100, //important
     host: config.database.host,
@@ -36,7 +39,6 @@ var pool = mysql.createPool({
     database: config.database.database,
     debug:  false
 });
-*/
 
 // ===========================
 // routes ====================
@@ -44,43 +46,113 @@ var pool = mysql.createPool({
 
 app.get('/', function(req, res) {
     res.json({
-        message: 'Main'
+        success: true
     });
 });
 
 app.post('/login', function(req, res) {
-    //var user = req.body;
-    var user = {
-        alias: req.body.alias,
-        id: req.body.alias,
-        email: 'peter.pan@web.de',
-        name: 'Peter Pan'
-    };
     
-    console.log(user);
+    var loginData = req.body;
     
-    if (!isValidUserData(user)) {
-        res.json({
+    if (loginData.alias == null || loginData.password == null) {
+        res.status(400).send({
             success: false,
-            message: 'Invalid User Data'
+            message: 'Bad request',
+            details: '"alias" or "password" field missing'
         });
-    } else {
-        var token = jwt.sign(user, app.get('secret'), {
-            expiresIn: '1d'
-        });
-        
-        user.token = token;
-        
-        res.json({
-            success: true,
-            message: 'Login successful',
-            user: user
-        });
+        return;
     }
+    
+    queryDB('SELECT * FROM user WHERE alias = ?',
+        [loginData.alias],
+        function(results, fields) {
+            
+            if (results == null || results.length == 0) {
+                res.status(401).send({
+                    success: false,
+                    message: 'Invalid user credentials',
+                    details: 'User does not exist'
+                });
+                return;
+            }
+            
+            var user = results[0];
+            bcrypt.compare(loginData.password, user.password.toString(),
+                function(err, result) {
+                    if (result) {
+                        delete user.password;
+                        var token = jwt.sign(user, app.get('secret'), {
+                            expiresIn: '1d'
+                        });
+                        res.json({
+                            success: true,
+                            message: 'Login successful',
+                            token: token
+                        });
+                    } else {
+                        res.status(401).send({
+                            success: false,
+                            message: 'Invalid user credentials',
+                            details: 'Wrong password'
+                        });
+                    }
+                }
+            );
+        },
+        function(error) {
+            res.status(500).send({
+                success: false,
+                message: 'Internal server error',
+                details: error.toString()
+            });
+        }
+    );
     
 });
 
 app.post('/register', function(req, res) {
+    var user = req.body;
+    
+    if (!isValidUserData(user)) {
+        res.status(400).send({
+            success: false,
+            message: 'Bad request',
+            details: 'One or more required field is missing or invalid'
+        });
+        return;
+    }
+    
+    user.id = shortid.generate();
+    bcrypt.hash(user.password, 10, function(hashError, hash) {
+        
+        if (hashError) {
+            res.status(500).send({
+                success: false,
+                message: 'Internal server error',
+                details: hashError.toString()
+            });
+            return;
+        }
+        
+        queryDB('INSERT INTO user VALUES(?, ?, ?, ?, ?, ?, ?, ?)',
+            [user.id, user.alias, user.name, user.email, hash, 0, 0, 0],
+            function(results, fields) {
+                res.json({
+                    success: true,
+                    message: 'User created'
+                });
+            },
+            function(dbError) {
+                res.status(400).send({
+                    success: false,
+                    message: 'Bad request',
+                    details: dbError.toString()
+                });
+            }
+        );
+    });
+    
+    
     
 });
 
@@ -92,12 +164,12 @@ apiRoutes.use(function(req, res, next) {
     if (token != null) {
         jwt.verify(token, app.get('secret'), function(err, decoded) {
             if (err) {
-                return res.json({
+                return res.status(403).send({
                     success: false,
                     message: 'Failed to authenticate: invalid token'
                 });
             } else {
-                console.log(decoded);
+                //console.log(decoded);
                 req.decoded = decoded;
                 next();
             }
@@ -117,11 +189,15 @@ apiRoutes.get('/test', function(req, res) {
 });
 
 apiRoutes.get('/games/:id', function(req, res) {
-    
+    res.send({
+        success: false
+    });
 });
 
 apiRoutes.post('/games', function(req, res) {
-    
+    res.send({
+        success: false
+    });
 });
 
 apiRoutes.get('/users', function(req, res) {
@@ -137,7 +213,36 @@ apiRoutes.get('/users', function(req, res) {
 });
 
 apiRoutes.get('/users/:id', function(req, res) {
-    
+    var userId = req.params.id;
+    if (userId === 'me' || userId === req.decoded.id) {
+        res.json({
+            success: true,
+            message: 'User data',
+            user: req.decoded
+        });
+    } else {
+        queryDB('SELECT alias, wins, draws, losses FROM user WHERE id = ?',
+            [userId],
+            function(results, fields) {
+                var user = {};
+                if (results != null && results.length > 0) {
+                    user = results[0];
+                }
+                res.json({
+                    success: true,
+                    message: 'User data',
+                    user: user
+                });
+            },
+            function(dbError) {
+                res.status(500).send({
+                    success: false,
+                    message: 'Internal server error',
+                    details: dbError.toString()
+                });
+            }
+        );
+    }
 });
 
 app.use('/api', apiRoutes);
@@ -279,15 +384,31 @@ io.sockets.on('connection', function(socket) {
 // utility functions =========
 // ===========================
 
-function isValidUserData(user) {
-    return typeof user.name !== 'undefined'
-            && typeof user.email !== 'undefined'
-            && typeof user.alias !== 'undefined'
-            && typeof user.id !== 'undefined';
+function isBlank(str) {
+    return (!str || /^\s*$/.test(str));
 }
 
-function combineIds(hostId, clientId) {
-    return hostId + "-|-" + clientId;
+function isValidUserData(user) {
+    return !isBlank(user.name) && !isBlank(user.email)
+            && !isBlank(user.alias) && !isBlank(user.password);
+}
+
+function queryDB(query, values, onSuccess, onError) {
+    pool.getConnection(function(err, connection) {
+        if (err) {
+            onError(err);
+            return;
+        }
+        
+        connection.query(query, values, function(err, results, fields) {
+            connection.release();
+            if (err) {
+                onError(err);
+            } else {
+                onSuccess(results, fields);
+            }
+        });
+    });
 }
 
 // ===========================

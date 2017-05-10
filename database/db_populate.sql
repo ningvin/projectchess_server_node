@@ -1,0 +1,2 @@
+insert into user values('0001', 'Zwegi', 'Peter Zwegat', 'peter@zwegat.de', '$2a$10$5jyzZ57mIKMLJqbkrXenBOU7Stxw9VGShdGmN/NAZm7UgiljPBQM6', 0, 0, 0);
+insert into user values('0002', 'Der Horst', 'Horst Lichter', 'horst@lichter.de', '$2a$10$5jyzZ57mIKMLJqbkrXenBOU7Stxw9VGShdGmN/NAZm7UgiljPBQM6', 0, 0, 0);
