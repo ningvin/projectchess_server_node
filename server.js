@@ -18,7 +18,11 @@ require('./sockets').init(server);
 
 app.use(bodyParser.json());
 app.use(require('./middlewares/access_control'));
-app.use(require('./controllers'));
+if (process.argv.length > 2 && process.argv[2] === '--mock') {
+    app.use(require('./controllers/mock'));
+} else {
+    app.use(require('./controllers'));
+}
 
 // ===========================
 // Start =====================
