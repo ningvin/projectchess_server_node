@@ -34,7 +34,8 @@ exports.init = function(server) {
         socket.on('join_lobby', function() {
             socket.join('lobby');
             socket.broadcast.to('lobby').emit('join_lobby', {
-                id: socket.user.id
+                id: socket.user.id,
+                alias: socket.user.alias
             });
         });
         
@@ -43,7 +44,8 @@ exports.init = function(server) {
          */
         socket.on('leave_lobby', function() {
             socket.broadcast.to('lobby').emit('leave_lobby', {
-                id: socket.user.id
+                id: socket.user.id,
+                alias: socket.user.alias
             });
             socket.leave('lobby');
         });
@@ -65,7 +67,8 @@ exports.init = function(server) {
             socket.invited = req.id;
             // Invite new user
             io.to(req.id).emit('game_invite', {
-                userId: socket.user.id,
+                id: socket.user.id,
+                alias: socket.user.alias,
                 socketId: socket.id
             });
         });
@@ -93,24 +96,31 @@ exports.init = function(server) {
             console.log('game_response');
             console.log(req);
             io.to(req.id).emit('game_response', {
+                id: socket.user.id,
+                alias: socket.user.alias,
                 accepted: req.accepted
             });
         });
         
-        socket.on('game_start', function(req) {
-            //io.to(req.id).emit('game_start'), 
+        socket.on('game_create', function(req) {
+            io.to(req.id).emit('game_create', {
+                id: socket.user.id,
+                alias: socket.user.alias
+            });
         });
         
         socket.on('game_launch', function(req) {
             console.log('Game Launch!');
             io.to(req.id).emit('game_launch', {
-                id: socket.user.id
+                id: socket.user.id,
+                alias: socket.user.alias
             });
         });
         
         socket.on('move', function(req) {
             io.to(req.id).emit('move', {
                 id: socket.user.id,
+                alias: socket.user.alias,
                 move: req.move
             });
         });
@@ -118,16 +128,26 @@ exports.init = function(server) {
         socket.on('chat', function(req) {
             var message = {
                 msg: req.msg,
-                user: socket.user.alias,
+                alias: socket.user.alias,
                 id: socket.user.id,
             }
             socket.broadcast.to(req.room).emit('chat', message);
         });
         
+        socket.on('swap_colors', function(req) {
+            console.log('swap_colors');
+            io.to(req.id).emit('swap_colors', {
+                id: socket.user.id,
+                alias: socket.user.alias,
+                move: req.move
+            });
+        });
+        
         socket.on('disconnect', function() {
             socket.leave('lobby');
             io.to('lobby').emit('lobby_leave', {
-                id: socket.user.id
+                id: socket.user.id,
+                alias: socket.user.alias
             });
         });
         
