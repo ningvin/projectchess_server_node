@@ -8,7 +8,11 @@ router.get('/', function(req, res) {
     io.of('/').in('lobby').clients(function(error, clients) {
         var users = [];
         for (var i = 0; i < clients.length; i++) {
-            users.push(io.sockets.connected[clients[i]].user.id);
+            var user = io.sockets.connected[clients[i]].user;
+            users.push({
+                id: user.id,
+                alias: user.alias
+            });
         }
         res.json({
             users: users
