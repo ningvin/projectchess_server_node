@@ -138,8 +138,15 @@ exports.init = function(server) {
             console.log('swap_colors');
             io.to(req.id).emit('swap_colors', {
                 id: socket.user.id,
-                alias: socket.user.alias,
-                move: req.move
+                alias: socket.user.alias
+            });
+        });
+        
+        socket.on('surrender', function(req) {
+            console.log('surrender');
+            io.to(req.id).emit('surrender', {
+                id: socket.user.id,
+                alias: socket.user.alias
             });
         });
         
