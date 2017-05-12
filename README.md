@@ -4,6 +4,9 @@
 
 1. Install [Node.js](https://nodejs.org/en/)
 2. If you plan to use Database features, setup a [MySQL Server](https://www.mysql.com/downloads/) (optional)
+    * Follow the installation instructions provided by MySQL
+    * Setup a user with sufficient permissions to read and write to the database
+    * Execute the [db_schema.sql](database/db_schema.sql) script to create the database and tables needed
 
 ## Installation
 
